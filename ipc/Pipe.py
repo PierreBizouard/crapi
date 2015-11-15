@@ -12,7 +12,6 @@ from __future__ import print_function
 from __future__ import unicode_literals
 # Python native libraries.
 from abc import ABCMeta
-from abc import abstractmethod
 from enum import Enum
 import random
 # Python 3rd party libraries.
@@ -154,7 +153,8 @@ class Pipe(object):
                     None
                 )
 
-    def __getOverlappedStruct(self):
+    # FIXME: Access with properties ;)
+    def _getOverlappedStruct(self):
         # We should use a new overlapped object for each asynchronous
         # operation since the MSDN site states:
         # "A common mistake is to reuse an OVERLAPPED structure before the
@@ -215,9 +215,11 @@ class Pipe(object):
 
     def connect(self, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
-            if timeout == 0:
+            if int(timeout) == 0:
                 event_timeout = w32ev.INFINITE
-            stream = self.__getOverlappedStruct()
+            else:
+                event_timeout = int(timeout)
+            stream = self._getOverlappedStruct()
             # Asynchronous named pipes return immediately!
             status_code = w32p.ConnectNamedPipe(
                 self.__hPipe, stream
@@ -228,7 +230,14 @@ class Pipe(object):
                     'status_code',
                     status_code
                 )
+            # import servicemanager as scm
+            # scm.LogInfoMsg(
+            #     "OSAUM-VMPROBE: (blocking...)!"
+            # )
             self.__waitForEvent(stream, event_timeout)
+            # scm.LogInfoMsg(
+            #     "OSAUM-VMPROBE: (pipe event received...)!"
+            # )
         else:
             status_code = w32p.ConnectNamedPipe(self.__hPipe, None)
             if status_code != 0:
@@ -237,7 +246,6 @@ class Pipe(object):
                     'status_code',
                     status_code
                 )
-
         return 0
 
     # Some notes about the read operation when in server view mode:
@@ -253,57 +261,58 @@ class Pipe(object):
     # TODO: ERROR_MORE_DATA in synchronous I/O only?
     def read(self, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
-            if timeout == 0:
+            if int(timeout) == 0:
                 event_timeout = 50  # 50ms is the default value per MSDN docs.
-            stream = self.__getOverlappedStruct()
+            else:
+                event_timeout = int(timeout)
+            stream = self._getOverlappedStruct()
             if buf_sz <= 0:
-                buf_sz = 1024
+                buf_sz = 2048
             ov_buf = w32f.AllocateReadBuffer(buf_sz)
-            if self.view == Pipe.View.SERVER:
-                pipe_data = ''
-                while True:
+            pipe_data = ''
+            while True:
+                try:
+                    pipe_status, pipe_buffer = w32f.ReadFile(
+                        self.__hPipe, ov_buf, stream
+                    )
+                except WinT.error, e:
+                    if e.args[0] == werr.ERROR_BROKEN_PIPE:
+                        return 1, stream.Offset, pipe_data
+                    else:
+                        raise
+                if pipe_status == 0 or \
+                   pipe_status == werr.ERROR_IO_PENDING:
+                    if pipe_status == werr.ERROR_IO_PENDING:
+                        self.__waitForEvent(stream, event_timeout)
                     try:
-                        pipe_status, pipe_buffer = w32f.ReadFile(
-                            self.__hPipe, ov_buf, stream
+                        read_bytes = w32f.GetOverlappedResult(
+                            self.__hPipe, stream, False
                         )
                     except WinT.error, e:
-                        if e.args[0] == werr.ERROR_BROKEN_PIPE:
+                        if e.args[0] == werr.ERROR_MORE_DATA:
+                            ov_buf = self.__expandBufferPipe(buf_sz)
+                            stream.Offset += len(pipe_buffer)
+                            pipe_data += pipe_buffer
+                            continue
+                        elif e.args[0] == werr.ERROR_BROKEN_PIPE:
                             return 1, stream.Offset, pipe_data
                         else:
                             raise
-                    if pipe_status == 0 or \
-                       pipe_status == werr.ERROR_IO_PENDING:
-                        if pipe_status == werr.ERROR_IO_PENDING:
-                            self.__waitForEvent(stream, event_timeout)
-                        try:
-                            read_bytes = w32f.GetOverlappedResult(
-                                self.__hPipe, stream, False
-                            )
-                        except WinT.error, e:
-                            if e.args[0] == werr.ERROR_MORE_DATA:
-                                ov_buf = self.__expandBufferPipe(buf_sz)
-                                stream.Offset += len(pipe_buffer)
-                                pipe_data += pipe_buffer
-                                continue
-                            elif e.args[0] == werr.ERROR_BROKEN_PIPE:
-                                return 1, stream.Offset, pipe_data
-                            else:
-                                raise
-                    elif pipe_status == werr.ERROR_MORE_DATA:
-                        ov_buf = self.__expandBufferPipe(buf_sz)
-                        stream.Offset += len(pipe_buffer)
-                        pipe_data += pipe_buffer
-                        continue
-                    else:
-                        raise PipeError(
-                            'Pipe encountered a fatal error!',
-                            'error_code',
-                            w32api.GetLastError()
-                        )
-                    stream.Offset += read_bytes
-                    pipe_data += pipe_buffer[:read_bytes]
-                    if read_bytes < len(pipe_buffer):
-                        return 0, stream.Offset, pipe_data
+                elif pipe_status == werr.ERROR_MORE_DATA:
+                    ov_buf = self.__expandBufferPipe(buf_sz)
+                    stream.Offset += len(pipe_buffer)
+                    pipe_data += pipe_buffer
+                    continue
+                else:
+                    raise PipeError(
+                        'Pipe encountered a fatal error!',
+                        'error_code',
+                        w32api.GetLastError()
+                    )
+                stream.Offset += read_bytes
+                pipe_data += pipe_buffer[:read_bytes]
+                if read_bytes < len(pipe_buffer):
+                    return 0, stream.Offset, pipe_data
 
         else:
             pipe_status, pipe_content = w32f.ReadFile(
@@ -311,23 +320,28 @@ class Pipe(object):
             )
             return 0, len(pipe_content), pipe_content
 
-    # TODO: Investigate why pipes required double the size of the string
+    # TODO: Investigate why pipes require double the size of the string
     #       since it uses a space between every character :@
     #       Also, attempt to send a zero-sized write! :P
+    # TODO: Simulate an ERROR_IO_PENDING since the ActiveState docs state
+    #       that this is a possiblity...
     def write(self, payload, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
-            if timeout == 0:
-                event_timeout = 50
-            if self.view == Pipe.View.CLIENT:
-                stream = self.__getOverlappedStruct()
-                if buf_sz > 0:
-                    str_buf = buffer(payload, 0, payload[:buf_sz]*2)
-                else:
-                    str_buf = buffer(payload, 0, len(payload)*2)
-                status_code, written_bytes = w32f.WriteFile(
-                    self.__hPipe, str_buf, stream
-                )
-                return status_code, written_bytes
+            if int(timeout) == 0:
+                event_timeout = 50  # 50ms is the default value per MSDN docs.
+            else:
+                event_timeout = int(timeout)
+            stream = self._getOverlappedStruct()
+            if buf_sz > 0:
+                str_buf = buffer(payload, 0, payload[:buf_sz]*2)
+            else:
+                str_buf = buffer(payload, 0, 2048)
+            # FIXME: ERROR_NO_DATA with Ctrl-C in server
+            status_code, written_bytes = w32f.WriteFile(
+                self.__hPipe, str_buf, stream
+            )
+            self.__waitForEvent(stream, event_timeout)
+            return status_code, written_bytes
         else:
             return w32f.WriteFile(
                 self.__hPipe, payload, None
@@ -335,14 +349,11 @@ class Pipe(object):
 
     def close(self):
         if self.view == Pipe.View.SERVER:
+            w32f.FlushFileBuffers(self.__hPipe)
             w32p.DisconnectNamedPipe(self.__hPipe)
-        if self.view == Pipe.View.CLIENT:
+        else:
             self.__hPipe.Close()
 
-    @abstractmethod
-    def listen():
-        pass
-
-    @abstractmethod
-    def shutdown():
-        pass
+    def shutdown(self):
+        if self.view == Pipe.View.SERVER:
+            self.__hPipe.Close()

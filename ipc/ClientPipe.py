@@ -16,12 +16,12 @@ import crapi.ipc.Pipe as Pipe
 
 class ClientPipe(Pipe.Pipe):
 
-    def listen(self):
-        raise NotImplementedError(
-            'This should only be done from a ServerPipe!'
-        )
+    def __init__(self, name='', ptype=Pipe.Pipe.Type.NAMED,
+                 mode=Pipe.Pipe.Mode.DUPLEX, channel=Pipe.Pipe.Channel.MESSAGE,
+                 transport=Pipe.Pipe.Transport.ASYNCHRONOUS):
 
-    def shutdown(self):
-        raise NotImplementedError(
-            'This should only be done from a ServerPipe!'
+        super(ClientPipe, self).__init__(
+            name=name, ptype=ptype, mode=mode, channel=channel,
+            transport=transport, view=Pipe.Pipe.View.CLIENT, instances=0,
+            buf_sz=[0, 0]
         )

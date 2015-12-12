@@ -18,7 +18,7 @@ class DaemonError(Exception):
 
     """
         This class efficiently communicates to the user when a daemon fatal
-        situtation has been encountered.
+        situation has been encountered.
     """
 
     def __init__(self, message, attribute_key, attribute_value, *args):

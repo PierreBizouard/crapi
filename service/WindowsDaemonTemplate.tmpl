@@ -5,13 +5,11 @@
 # terms of the ASF 2.0 license.
 #
 
-"""Part of the service module."""
+"""{{class_docstring}}"""
 
 # NOTE: unicode_literals causes problems when using instantiation with 'type'
 # so use str which is a no-op in Python 3.x and converts arguments properly
 # in Python 2.x
-# TODO: This is a nested daemon factory class. Maybe we can enhance it?
-#       This is also known as CRTP: Curiously recurring template pattern.
 from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
@@ -26,21 +24,57 @@ if sys.platform.startswith('win'):
     import servicemanager as scm
     import win32service as w32svc
     import win32serviceutil as w32scu
-    #FIXME: UAC elevation?
-#    import win32con as w32con
-#    import win32com.shell.shell as w32sh_sh
-#    import win32com.shell.shellcon as w32shcon
     import win32event as w32ev
 
+{#-
+# TODO: Add linux service entry points here or in another file!
+# TODO: Consider a parse decorator! :]
+# FIXME: Use a thread to keep the dispatcher usage at a minimum
+#        and add a dictionary that maps a wait object to a dispatch
+#        table so to properly wrap functionality :)
+#        Example:         self.event = {
+#                            'stop': stop,
+#                            'timeout': timeout,
+#                            'unknown': unknown etc
+#                         } #}
 
-class WindowsDaemonTemplate(object, w32scu.ServiceFramework):
+# NOTE: If the pythonservice.exe is not registered properly then a runtime
+#       error will occur. To fix this you must go to:
+#       HKLM\Software\Python\PythonService\<py_ver - such as 2.7> and modify
+#       the registry key!
+#       This is probably a bug triggered when re-registering the service with a
+#       new virtualenv or by improperly deleting the old one so maybe I should
+#       report it to the pywin32 list as bug?
+scm.LogInfoMsg(
+    'pythonservice.exe sys.path:\n' + '\n'.join('%s' % p for p in sys.path)
+)
+
+
+class Logger(object):
+
+    def info(self):
+        pass
+
+    def warning(self):
+        pass
+
+    def error(self):
+        pass
+
+
+Logger.info = scm.LogInfoMsg
+Logger.warning = scm.LogWarningMsg
+Logger.error = scm.LogErrorMsg
+
+
+class {{name}}(object, w32scu.ServiceFramework):
 
     """A class that enables implementation of Windows services."""
 
-    _svc_name_ = 'crapi'
-    _svc_display_name_ = 'CRAPI: Common Range API'
-    _svc_description_ = 'Dynamic runtime templating engine of Windows Services.'
-    _svc_timeout_ = 0
+    _svc_name_ = '{{name}}'
+    _svc_display_name_ = '{{display_name}}'
+    _svc_description_ = '{{description}}'
+    _svc_timeout_ = {{timeout}}
     _svc_package_ = str(sys.modules[__name__]) + '.' + __name__
 
     def __init__(self, args):
@@ -52,7 +86,7 @@ class WindowsDaemonTemplate(object, w32scu.ServiceFramework):
         w32scu.ServiceFramework.__init__(self, args)
         self.__hStop = w32ev.CreateEvent(None, False, False, None)
         self.__hShutdown = w32ev.CreateEvent(None, False, False, None)
-        self.pipe = ServerPipe.ServerPipe(name=self.name)
+        self.pipe = ServerPipe.ServerPipe(name=self.name, sa_profile='daemon')
         self.stream = self.pipe._getOverlappedStruct()
         if self._svc_timeout_ == 0:
             self.__timeout = w32ev.INFINITE
@@ -69,14 +103,12 @@ class WindowsDaemonTemplate(object, w32scu.ServiceFramework):
     def SvcShutdown(self):
         self.shutdown()
 
-    #TODO: Add linux service entry points!
-
     def _start(self):
         scm.LogInfoMsg(
             self.display_name + ": Starting service..."
         )
         self.ReportServiceStatus(w32svc.SERVICE_RUNNING)
-        self._run()
+        self.run()
 
     def _stop(self):
         scm.LogInfoMsg(
@@ -96,20 +128,25 @@ class WindowsDaemonTemplate(object, w32scu.ServiceFramework):
         self.pipe.shutdown()
         w32ev.SetEvent(self.__hShutdown)
 
-    def _run(self):
+    {% if action_run %}
+    {{action_run|indent(4, false)}}
+    {% endif %}
 
+    {% if not action_run %}
+    def run(self):
+
+        self.action.bootstrap()
+
+        #TODO: Add pre-initialization code (like change pipe type etc)
         self.__hEvents = self.__hStop, self.__hShutdown, self.stream.hEvent
-        #FIXME: Add pre-initialization code (like change pipe type etc)
 
         while True:
 
-            scm.LogInfoMsg(
-                self.display_name + ": Connecting..."
-            )
+            self.action.preprocess()
+
+            scm.LogInfoMsg(self.display_name + ": Waiting for connection...")
             self.pipe.connect()
-            scm.LogInfoMsg(
-                self.display_name + ": Connected!"
-            )
+
             w32ev.SetEvent(self.stream.hEvent)
             rc = w32ev.MsgWaitForMultipleObjects(
                 self.__hEvents,
@@ -119,20 +156,16 @@ class WindowsDaemonTemplate(object, w32scu.ServiceFramework):
             )
 
             if rc == w32ev.WAIT_OBJECT_0:
-                scm.LogInfoMsg(
-                    self.display_name + ": Received stop event..."
-                )
+                scm.LogInfoMsg(self.display_name + ": Received stop event...")
                 break
             elif rc == w32ev.WAIT_OBJECT_0+1:
                 scm.LogInfoMsg(
                     self.display_name + ": Received shutdown event..."
                 )
             elif rc == w32ev.WAIT_OBJECT_0+2:
-                scm.LogInfoMsg(
-                    self.display_name + ": Received pipe event..."
-                )
+                scm.LogInfoMsg(self.display_name + ": Pipe client connected!")
 
-                self.advance()
+                self.action.advance()
 
                 scm.LogInfoMsg(
                     self.display_name + ": Finished processing pipe event..."
@@ -146,33 +179,30 @@ class WindowsDaemonTemplate(object, w32scu.ServiceFramework):
             else:
                 raise RuntimeError("What is this? Quack quack!")
 
+            self.action.postprocess()
+
+        self.action.cleanup()
+
         scm.LogInfoMsg(self.display_name + ": Exiting service...")
+    {% endif %}
 
-    #FIXME: Add abstracts or define methods in client and replace in
-    # implemented file.
-
-    #@abstractmethod
     def start(self):
         self._start()
 
-    #@abstractmethod
     def stop(self):
         self._stop()
 
-    #@abstractmethod
     def shutdown(self):
         self._shutdown()
 
-    #@abstractmethod
-    def advance(self):
-        pipe_status, pipe_bytes, pipe_content = self.pipe.read()
-        scm.LogInfoMsg(
-            self.display_name + " (Pipe status): " + str(pipe_status)
-        )
-        scm.LogInfoMsg(
-            self.display_name + " (Pipe bytes): " + str(pipe_bytes)
-        )
-        scm.LogInfoMsg(
-            self.display_name + " (Pipe content): " + pipe_content
-        )
-        self.pipe.close()
+    {% if not action_run %}
+    {{action_bootstrap|indent(4, false)}}
+
+    {{action_preprocess|indent(4, false)}}
+
+    {{action_advance|indent(4, false)}}
+
+    {{action_postprocess|indent(4, false)}}
+
+    {{action_cleanup|indent(4, false)}}
+    {%- endif %}

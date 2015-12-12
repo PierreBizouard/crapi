@@ -18,10 +18,10 @@ class ClientPipe(Pipe.Pipe):
 
     def __init__(self, name='', ptype=Pipe.Pipe.Type.NAMED,
                  mode=Pipe.Pipe.Mode.DUPLEX, channel=Pipe.Pipe.Channel.MESSAGE,
-                 transport=Pipe.Pipe.Transport.ASYNCHRONOUS):
+                 transport=Pipe.Pipe.Transport.ASYNCHRONOUS, sa=None):
 
         super(ClientPipe, self).__init__(
             name=name, ptype=ptype, mode=mode, channel=channel,
             transport=transport, view=Pipe.Pipe.View.CLIENT, instances=0,
-            buf_sz=[0, 0]
+            buf_sz=[0, 0], sa=sa
         )

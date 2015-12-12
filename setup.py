@@ -10,23 +10,45 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
+from sys import platform
 
-here = path.abspath(path.dirname(__file__))
+cwd = path.abspath(path.dirname(__file__))
+md = path.join(cwd, 'README.md')
+
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
-    long_description = f.read()
+def md2rst():
+    try:
+        from pypandoc import convert
+        print(md)
+        return convert(md, 'rst')
+    except ImportError:
+        print(
+            "WARNING: Failed to convert Markdown to RST: " +
+            "pandoc module is required!"
+        )
+        print("WARNING: Reading MD file...")
+        with open(md, encoding='utf-8') as f:
+            return f.read()
+
+if platform.startswith('win'):
+    with open('requirements.win.txt') as f:
+        requirements = f.read().splitlines()
+else:
+    with open('requirements.txt') as f:
+        requirements = f.read().splitlines()
 
 setup(
+
     name='crapi',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.0.1a5',
+    version='0.0.1a11',
 
     description='CRAPI: Common Range API',
-    long_description=long_description,
+    long_description=md2rst(),
 
     # The project's main homepage.
     url='https://github.com/kounavi/crapi',
@@ -34,6 +56,8 @@ setup(
     # Author details
     author='Iraklis D., Kritonas P.',
     author_email='hdiakos@outlook.com, kriton_pilavidis@outlook.com',
+
+    platforms=['windows', 'linux'],
 
     # Choose your license
     license='ASF 2.0',
@@ -48,7 +72,7 @@ setup(
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
-        'Intended Audience :: Information :: Technology',
+        'Intended Audience :: Information Technology',
         'Intended Audience :: Science/Research',
         'Topic :: Software Development :: Libraries :: Application Frameworks',
 
@@ -65,11 +89,13 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='windows linux systems development',
+    keywords='systems development wrapper pipes services daemons',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=find_packages(exclude=['contrib', 'docs', 'tests']),
+    packages=find_packages(
+        exclude=['contrib', 'docs', 'tests', 'messaging', 'service.*']
+    ),
 
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
@@ -79,6 +105,6 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['enum34', 'future'],
+    install_requires=requirements
 
 )

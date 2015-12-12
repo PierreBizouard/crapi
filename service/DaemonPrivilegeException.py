@@ -12,19 +12,20 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 
-class DaemonNamingError(Exception):
+class DaemonPrivilegeException(Exception):
 
-    """A class for raising daemon errors."""
+    """A class for raising daemon privilege errors."""
 
     """
-        This class efficiently communicates to the user when a daemon naming
-        error has been encountered.
+        This class efficiently communicates to the user when a daemon privilege
+        escalation (usually to admin (Windows) or sudo (Linux) ) is required.
     """
 
     def __init__(self, message, attribute_key, attribute_value, *args):
         """Default initialization class method."""
         """
-            Sets the required parameters when throwing a daemon error.
+            Sets the required parameters when throwing a daemon privilege
+            exception.
             Apart from the exception message (string), parameters are pairs of
             (attribute key, attribute value) aka pairs of (string, object)
             values.
@@ -35,6 +36,6 @@ class DaemonNamingError(Exception):
         self.arglist = []
         for arg in args:
             self.arglist.append(arg)
-        super(DaemonNamingError, self).__init__(
+        super(DaemonPrivilegeException, self).__init__(
             message, attribute_key, attribute_value, *args
         )

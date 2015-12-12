@@ -60,7 +60,7 @@ class Pipe(object):
     # TODO: Check buffer ends by overflowing them!
     def __init__(self, name='', ptype=Type.NAMED, mode=Mode.DUPLEX,
                  channel=Channel.MESSAGE, transport=Transport.ASYNCHRONOUS,
-                 view=View.SERVER, instances=0, buf_sz=[0, 0]):
+                 view=View.SERVER, instances=0, buf_sz=[0, 0], sa=None):
 
         if name == '':
             self.name = 'pipe' + str(random.randint(9999, 9999999))
@@ -140,7 +140,7 @@ class Pipe(object):
                     buf_sz[1],
                     buf_sz[0],
                     0,  # 50ms per MSDN documentation
-                    None
+                    sa
                 )
             else:
                 self.__hPipe = w32f.CreateFile(
@@ -181,7 +181,7 @@ class Pipe(object):
 
         return stream
 
-    def __waitForEvent(self, stream, event_timeout):
+    def __waitForEvent(self, stream, evTimeout):
         # Asynchronous I/O operations may complete in the
         # blink of an eye giving the false impression that
         # it completed as a synchronous I/O. As such, we
@@ -191,22 +191,22 @@ class Pipe(object):
         # not wait for data to become available (bWait is
         # set to False) otherwise it will complain that the
         # event handler is in a non-signaled state.
-        event_code = w32ev.WaitForSingleObject(
-            stream.hEvent, event_timeout
+        evCode = w32ev.WaitForSingleObject(
+            stream.hEvent, evTimeout
         )
-        if event_code == w32ev.WAIT_TIMEOUT:
+        if evCode == w32ev.WAIT_TIMEOUT:
             raise PipeTimeoutError(
                     'Connection timeout while awaiting pipe activity!',
-                    'event_timeout',
-                    event_timeout,
-                    'event_code',
-                    event_code
+                    'timeout',
+                    evTimeout,
+                    'event',
+                    evCode
             )
-        elif event_code != w32ev.WAIT_OBJECT_0:
+        elif evCode != w32ev.WAIT_OBJECT_0:
             raise PipeError(
                 'Unexpected pipe signal code event!',
-                'event_code',
-                event_code
+                'event',
+                evCode
             )
 
     def __expandBufferPipe(self, buf_sz):
@@ -216,28 +216,28 @@ class Pipe(object):
     def connect(self, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
             if int(timeout) == 0:
-                event_timeout = w32ev.INFINITE
+                evTimeout = w32ev.INFINITE
             else:
-                event_timeout = int(timeout)
+                evTimeout = int(timeout)
             stream = self._getOverlappedStruct()
             # Asynchronous named pipes return immediately!
             status_code = w32p.ConnectNamedPipe(
                 self.__hPipe, stream
             )
-            if status_code != werr.ERROR_IO_PENDING:
+            # From the MSDN docs:
+            #   https://msdn.microsoft.com/en-us/library/windows/desktop/aa365146(v=vs.85).aspx
+            # If a client connects before the function is called, the function
+            # returns zero and GetLastError returns ERROR_PIPE_CONNECTED.
+            if status_code == werr.ERROR_PIPE_CONNECTED:
+                w32ev.SetEvent(stream.hEvent)
+            elif status_code != werr.ERROR_IO_PENDING:
                 raise PipeError(
                     'Failed to create unsynchronous named pipe connection!',
                     'status_code',
                     status_code
                 )
-            # import servicemanager as scm
-            # scm.LogInfoMsg(
-            #     "OSAUM-VMPROBE: (blocking...)!"
-            # )
-            self.__waitForEvent(stream, event_timeout)
-            # scm.LogInfoMsg(
-            #     "OSAUM-VMPROBE: (pipe event received...)!"
-            # )
+            else:
+                self.__waitForEvent(stream, evTimeout)
         else:
             status_code = w32p.ConnectNamedPipe(self.__hPipe, None)
             if status_code != 0:
@@ -262,9 +262,9 @@ class Pipe(object):
     def read(self, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
             if int(timeout) == 0:
-                event_timeout = 50  # 50ms is the default value per MSDN docs.
+                evTimeout = 50  # 50ms is the default value per MSDN docs.
             else:
-                event_timeout = int(timeout)
+                evTimeout = int(timeout)
             stream = self._getOverlappedStruct()
             if buf_sz <= 0:
                 buf_sz = 2048
@@ -283,7 +283,7 @@ class Pipe(object):
                 if pipe_status == 0 or \
                    pipe_status == werr.ERROR_IO_PENDING:
                     if pipe_status == werr.ERROR_IO_PENDING:
-                        self.__waitForEvent(stream, event_timeout)
+                        self.__waitForEvent(stream, evTimeout)
                     try:
                         read_bytes = w32f.GetOverlappedResult(
                             self.__hPipe, stream, False
@@ -328,9 +328,9 @@ class Pipe(object):
     def write(self, payload, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
             if int(timeout) == 0:
-                event_timeout = 50  # 50ms is the default value per MSDN docs.
+                evTimeout = 50  # 50ms is the default value per MSDN docs.
             else:
-                event_timeout = int(timeout)
+                evTimeout = int(timeout)
             stream = self._getOverlappedStruct()
             if buf_sz > 0:
                 str_buf = buffer(payload, 0, payload[:buf_sz]*2)
@@ -340,7 +340,7 @@ class Pipe(object):
             status_code, written_bytes = w32f.WriteFile(
                 self.__hPipe, str_buf, stream
             )
-            self.__waitForEvent(stream, event_timeout)
+            self.__waitForEvent(stream, evTimeout)
             return status_code, written_bytes
         else:
             return w32f.WriteFile(

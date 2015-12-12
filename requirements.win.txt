@@ -1,0 +1,5 @@
+--extra-index-url https://repo.fury.io/kounavi/
+enum34==1.0.4
+future==0.15.2
+jinja2==2.8
+pywin32==219

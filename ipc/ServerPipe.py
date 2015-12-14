@@ -48,6 +48,7 @@ class ServerPipe(Pipe.Pipe):
 
     # Proper security descriptor with World R/W access but only 'Owner'
     # modify access. Thanks Mark :]
+    # TODO: Modify pipe object sa settings in daemon package.
     def __setServiceDefaultSA(self):
         if not sys.platform.startswith('win'):
             return

@@ -24,6 +24,7 @@ import re
 import imp
 import inspect
 import types
+import errno
 # Python 3rd party libraries.
 import jinja2
 
@@ -186,7 +187,11 @@ def instantiate(
     dst_filepath = base_dir + os.sep + 'rt' + os.sep + class_file
 
     # NOTE: Workaround jinja2's weird caching behaviour :/
-    os.remove(dst_filepath)
+    try:
+        os.remove(dst_filepath)
+    except OSError, e:
+        if e.errno != errno.ENOENT:
+            raise
     tmpl_env = jinja2.Environment(
         loader=jinja2.PackageLoader(class_name, base_dir),
         trim_blocks=True,

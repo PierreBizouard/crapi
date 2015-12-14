@@ -32,11 +32,14 @@ def md2rst():
             return f.read()
 
 if platform.startswith('win'):
-    with open('requirements.win.txt') as f:
-        requirements = f.read().splitlines()
+    req_file = 'requirements.win.txt'
 else:
-    with open('requirements.txt') as f:
-        requirements = f.read().splitlines()
+    req_file = 'requirements.txt'
+with open(req_file) as f:
+    requirements = filter(
+        lambda s: not('-e .' in s or '--extra-index-url' in s),
+        f.read().splitlines()
+    )
 
 setup(
 
@@ -45,7 +48,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.0.1a11',
+    version='0.0.1a12',
 
     description='CRAPI: Common Range API',
     long_description=md2rst(),
@@ -89,7 +92,7 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='systems development wrapper pipes services daemons',
+    keywords='backend systems development wrapper pipes services daemons',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().

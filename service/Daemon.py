@@ -36,8 +36,6 @@ if sys.platform.startswith('win'):
     import winerror as werr
 
 
-# FIXME: Finalize created file by injecting overriden code to created
-#        template.
 # NOTE: SEE_MASK_NOASYNC = SEE_MASK_NOCLOSEPROCESS + SEE_MASK_FLAG_DDEWAIT
 class Daemon(object):
 
@@ -75,9 +73,9 @@ class Daemon(object):
             folder=venv_dir, name=venv_name
         )
 
-        if True:
-            return
-
+        # FIXME (critical): Check the registry that:
+        #        HKLM\Software\Python\PythonService\<py_ver - such as 2.7> key
+        #       is correctly set!
         # FIXME: If the service is already installed reload its signature via
         #        the registry.
         # FIXME: If the service is deleted from sc.exe then add this file to
@@ -97,16 +95,21 @@ class Daemon(object):
                     ' "' + self.description + '" ' +
                     self.python_class
                 )
-                self.__install(su_aware=su_aware, cmd=cmd, binary=py_bin_path)
-        finally:
+                self.__install(
+                    su_aware=su_aware, cmd=cmd, binary=py_bin_path
+                )
+        # NOTE: Don't use a finally blocs so as to inform user about wrongly
+        #       registered virtualenv value in the registry hive
+        #       HKLM\Software\Python\PythonService\<py_ver - such as 2.7> for
+        #       pythonservice.exe!
+        svc_codes = w32scu.QueryServiceStatus(self.name)
+        if svc_codes[1] == w32svc.SERVICE_STOPPED:
             cmd = (
                 src_file_md + os.sep + 'management' +
                 os.sep + 'Administrator.py' +
                 ' activate ' + self.name
             )
-            svc_codes = w32scu.QueryServiceStatus(name)
-            if svc_codes[1] == w32svc.SERVICE_STOPPED:
-                self.__start(su_aware=su_aware, cmd=cmd, binary=py_bin_path)
+            self.__start(su_aware=su_aware, cmd=cmd, binary=py_bin_path)
         self.pipe = ClientPipe.ClientPipe(name=self.name)
 
     def __install(self, su_aware, cmd, binary):

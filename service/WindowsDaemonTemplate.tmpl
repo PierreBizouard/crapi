@@ -82,6 +82,7 @@ class {{name}}(object, w32scu.ServiceFramework):
         self.name = self._svc_name_
         self.display_name = self._svc_display_name_
         self.description = self._svc_description_
+        self.logger = Logger()
 
         w32scu.ServiceFramework.__init__(self, args)
         self.__hStop = w32ev.CreateEvent(None, False, False, None)
@@ -135,14 +136,14 @@ class {{name}}(object, w32scu.ServiceFramework):
     {% if not action_run %}
     def run(self):
 
-        self.action.bootstrap()
+        self.bootstrap()
 
         #TODO: Add pre-initialization code (like change pipe type etc)
         self.__hEvents = self.__hStop, self.__hShutdown, self.stream.hEvent
 
         while True:
 
-            self.action.preprocess()
+            self.preprocess()
 
             scm.LogInfoMsg(self.display_name + ": Waiting for connection...")
             self.pipe.connect()
@@ -165,7 +166,7 @@ class {{name}}(object, w32scu.ServiceFramework):
             elif rc == w32ev.WAIT_OBJECT_0+2:
                 scm.LogInfoMsg(self.display_name + ": Pipe client connected!")
 
-                self.action.advance()
+                self.advance()
 
                 scm.LogInfoMsg(
                     self.display_name + ": Finished processing pipe event..."
@@ -179,9 +180,9 @@ class {{name}}(object, w32scu.ServiceFramework):
             else:
                 raise RuntimeError("What is this? Quack quack!")
 
-            self.action.postprocess()
+            self.postprocess()
 
-        self.action.cleanup()
+        self.cleanup()
 
         scm.LogInfoMsg(self.display_name + ": Exiting service...")
     {% endif %}

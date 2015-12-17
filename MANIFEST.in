@@ -1,9 +1,0 @@
-include LICENSE.txt requirements.txt README.md README.rst
-include crapi/service/WindowsDaemonTemplate.tmpl
-include crapi/service/rt/__init__.py
-exclude MANIFEST.in
-recursive-exclude docs *
-recursive-exclude experimental *
-recursive-exclude tests *
-prune crapi/messaging
-prune crapi/service/rt

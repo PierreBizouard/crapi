@@ -37,6 +37,11 @@ __CLASS_NAME_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+__IMPORT_NAME_PATTERN = re.compile(
+    "import ^[-a-z0-9_\.]$",
+    re.IGNORECASE
+)
+
 
 class ACTION(Enum):
     INSTALL = 'install'
@@ -49,15 +54,49 @@ class WindowsDaemonFactory(object):
 
     """A class that allows creating templated Windows services."""
 
+
+def __xor(a, b): return bool(a) ^ bool(b)
+
+
+# Jinja2 custom template filters.
+def py_indent(s, indent, lines, indent_first, same, maximum=False):
+    source = s.splitlines()
+    l = lines[0]    # Minimum
+    lines = set(lines)
+    space = ''
+    if indent_first:
+        if same:
+            for i in range(indent):
+                space += ' '
+        else:
+            for i in range(indent//2):
+                space += ' '
+        source[0] = space + source[0]
+    for line in source:
+        space = ''
+        if maximum:
+            for i in range(indent):
+                space += ' '
+            source[l-1] = space + source[l-1]
+            l += 1
+        else:
+            if l in lines:
+                for i in range(indent):
+                    space += ' '
+                source[l-1] = space + source[l-1]
+            l += 1
+    return '\n'.join(source)
+
+
     #FIXME: Use unassociated attribute for users who do not wish to use our
     #       daemon library for daemon creation but want to control it instead.
+    #FIXME: User imports should be handled too (decorator maybe?)
+    # TODO: Use a decorator in the sense of annotation.
     #TODO: Use uuid and anonymous groups with dictionary lookups.
-
-
 def instantiate(
     name='crapi', display_name='CRAPI: Common Range API',
     description='Dynamic runtime templating engine of Daemon services.',
-    timeout=0, action=ACTION.UPDATE, action_file=None
+    timeout=0, action_policy=ACTION.UPDATE, action_file='.'
 ):
 
     """A class that enables implementation of Windows services."""
@@ -88,29 +127,76 @@ def instantiate(
     cwf = os.path.realpath(top_frame)
     cwd = os.path.dirname(cwf)
 
+    # NOTE - Resolution rules:
+    # File that calls user's daemon actions and is in '.':
+    #   Resolve path of user file by assuming that action_file == name.
+    # File that calls user's daemon actions and path is relative to caller:
+    #   Resolve path of user file for given action_file.
+    # In any case, created service will have class_name == name.
     if action_file == '.':
-        action = imp.load_source(
-            'crapi.service.rt.' + class_name + 'DaemonUserFunctions',
-            cwd + os.sep + class_name + 'DaemonUserFunctions.py'
+        action_md = imp.load_source(
+            'crapi.service.rt.' + class_name,
+            cwd + os.sep + class_name + '.py'
         )
     else:
-        action = imp.load_source(
-            'crapi.service.rt.' + class_name + 'DaemonUserFunctions',
+        action_md = imp.load_source(
+            'crapi.service.rt.' + action_file.split('\.py')[0],
             os.path.realpath(action_file)
         )
 
+    if hasattr(action_md, class_name):
+        print('Class')
+        action = getattr(action_md, class_name)
+        indent = 0
+        if not isinstance(action, type):
+            raise DaemonContractError(
+                'The action signature is not a class!',
+                'action',
+                type(action)
+            )
+    else:
+        print('Function')
+        action = action_md
+        indent = 4
+
+    action_init = None
     action_run = None
     action_advance = None
-    action_bootstrap = 'def bootstrap(self):\n    pass'
-    action_preprocess = 'def preprocess(self):\n    pass'
-    action_postprocess = 'def postprocess(self):\n    pass'
-    action_cleanup = 'def cleanup(self):\n    pass'
+    action_bootstrap = 'def bootstrap(self): pass'
+    action_preprocess = 'def preprocess(self): pass'
+    action_postprocess = 'def postprocess(self): pass'
+    action_cleanup = 'def cleanup(self): pass'
+    if hasattr(action_md, class_name):
+        if hasattr(action, '__init__'):
+            if isinstance(action.__init__, types.MethodType):
+                action_init = ''.join(
+                    inspect.getsource(action.__init__).strip().splitlines(
+                        True
+                    )[1:]
+                )
+            # NOTE: Implicit object - slot-wrapper
+    elif hasattr(action, 'init'):
+        if not isinstance(action.init, types.FunctionType):
+            raise DaemonContractError(
+                'The init method signature is not a function!',
+                'action.init',
+                type(action.init)
+            )
+        else:
+            action_init = ''.join(
+                inspect.getsource(action.init).strip().splitlines(
+                    True
+                )[1:]
+            )
     if hasattr(action, 'run'):
-        if not isinstance(action.run, types.FunctionType):
+        if not __xor(
+            isinstance(action.run, types.FunctionType),
+            isinstance(action.run, types.MethodType)
+        ):
             raise DaemonContractError(
                 'The run method signature is not a function!',
-                'action.advance',
-                type(action.advance)
+                'action.run',
+                type(action.run)
             )
         action_run = inspect.getsource(action.run).strip()
     else:
@@ -120,16 +206,22 @@ def instantiate(
                 'action.attributes',
                 dir(action)
             )
-        elif not isinstance(action.advance, types.FunctionType):
-            raise DaemonContractError(
-                'The advance method signature is not a function!',
-                'action.advance',
-                type(action.advance)
-            )
+        elif not __xor(
+                isinstance(action.advance, types.FunctionType),
+                isinstance(action.advance, types.MethodType)
+             ):
+                raise DaemonContractError(
+                    'The advance method signature is not a function!',
+                    'action.advance',
+                    type(action.advance)
+                )
         else:
             action_advance = inspect.getsource(action.advance).strip()
         if hasattr(action, 'bootstrap'):
-            if not isinstance(action.bootstrap, types.FunctionType):
+            if not __xor(
+                isinstance(action.bootstrap, types.FunctionType),
+                isinstance(action.bootstrap, types.MethodType)
+            ):
                 raise DaemonContractError(
                     'The bootstrap method signature is not a function!',
                     'action.bootstrap',
@@ -138,7 +230,10 @@ def instantiate(
             else:
                 action_bootstrap = inspect.getsource(action.bootstrap).strip()
         if hasattr(action, 'preprocess'):
-            if not isinstance(action.preprocess, types.FunctionType):
+            if not __xor(
+                isinstance(action.preprocess, types.FunctionType),
+                isinstance(action.preprocess, types.MethodType)
+            ):
                 raise DaemonContractError(
                     'The preprocess method signature is not a function!',
                     'action.preprocess',
@@ -149,7 +244,10 @@ def instantiate(
                     action.preprocess
                 ).strip()
         if hasattr(action, 'postprocess'):
-            if not isinstance(action.postprocess, types.FunctionType):
+            if not __xor(
+                isinstance(action.postprocess, types.FunctionType),
+                isinstance(action.postprocess, types.MethodType)
+            ):
                 raise DaemonContractError(
                     'The postprocess method signature is not a function!',
                     'action.postprocess',
@@ -160,7 +258,10 @@ def instantiate(
                     action.postprocess
                 ).strip()
         if hasattr(action, 'cleanup'):
-            if not isinstance(action.cleanup, types.FunctionType):
+            if not __xor(
+                isinstance(action.cleanup, types.FunctionType),
+                isinstance(action.cleanup, types.MethodType)
+            ):
                 raise DaemonContractError(
                     'The cleanup method signature is not a function!',
                     'action.cleanup',
@@ -198,37 +299,74 @@ def instantiate(
         lstrip_blocks=True,
         keep_trailing_newline=True
     )
+    tmpl_env.filters['py_indent'] = py_indent
     template_file = tmpl_env.get_template(template_class)
 
-    if not os.path.isfile(dst_filepath) or action == ACTION.UPDATE:
+    if not os.path.isfile(dst_filepath) or action_policy == ACTION.UPDATE:
         with io.open(dst_filepath, 'w') as fdout:
             if action_run is None:
-                print(
-                    template_file.render(
-                        class_docstring=class_docstring,
-                        name=class_name,
-                        display_name=display_name,
-                        description=description,
-                        timeout=timeout,
-                        action_advance=action_advance,
-                        action_bootstrap=action_bootstrap,
-                        action_preprocess=action_preprocess,
-                        action_postprocess=action_postprocess,
-                        action_cleanup=action_cleanup
-                        ),
-                    file=fdout
-                )
+                if action_init is None:
+                    print(
+                        template_file.render(
+                            class_docstring=class_docstring,
+                            name=class_name,
+                            display_name=display_name,
+                            description=description,
+                            timeout=timeout,
+                            indent=indent,
+                            action_advance=action_advance,
+                            action_bootstrap=action_bootstrap,
+                            action_preprocess=action_preprocess,
+                            action_postprocess=action_postprocess,
+                            action_cleanup=action_cleanup
+                            ),
+                        file=fdout
+                    )
+                else:
+                    print(
+                        template_file.render(
+                            class_docstring=class_docstring,
+                            name=class_name,
+                            display_name=display_name,
+                            description=description,
+                            timeout=timeout,
+                            indent=indent,
+                            action_init=action_init,
+                            action_advance=action_advance,
+                            action_bootstrap=action_bootstrap,
+                            action_preprocess=action_preprocess,
+                            action_postprocess=action_postprocess,
+                            action_cleanup=action_cleanup
+                            ),
+                        file=fdout
+                    )
             else:
-                print(
-                    template_file.render(
-                        class_docstring=class_docstring,
-                        name=class_name,
-                        display_name=display_name,
-                        description=description,
-                        timeout=timeout,
-                        action_run=action_run
-                        ),
-                    file=fdout
-                )
+                if action_init is None:
+                    print(
+                        template_file.render(
+                            class_docstring=class_docstring,
+                            name=class_name,
+                            display_name=display_name,
+                            description=description,
+                            timeout=timeout,
+                            indent=indent,
+                            action_run=action_run
+                            ),
+                        file=fdout
+                    )
+                else:
+                    print(
+                        template_file.render(
+                            class_docstring=class_docstring,
+                            name=class_name,
+                            display_name=display_name,
+                            description=description,
+                            timeout=timeout,
+                            indent=indent,
+                            action_init=action_init,
+                            action_run=action_run
+                            ),
+                        file=fdout
+                    )
 
     return (class_module, proj_base_path + class_module + '.' + class_name)

@@ -76,15 +76,19 @@ class Daemon(object):
         # FIXME (critical): Check the registry that:
         #        HKLM\Software\Python\PythonService\<py_ver - such as 2.7> key
         #       is correctly set!
-        # FIXME: If the service is already installed reload its signature via
+        # TODO: If the service is already installed reload its signature via
         #        the registry.
-        # FIXME: If the service is deleted from sc.exe then add this file to
+        # TODO: If the service is deleted from sc.exe then add this file to
         #        folder (i.e. removed - check rt folder).
         try:
-            svc_codes = w32scu.QueryServiceStatus(name)
+            svc_codes = w32scu.QueryServiceStatus(self.name)
             if svc_codes[1] == w32svc.SERVICE_STOPPED:
-                w32scu.StartService(serviceName=self.name)
-                Daemon.start(name=self.name)
+                cmd = (
+                    src_file_md + os.sep + 'management' +
+                    os.sep + 'Administrator.py' +
+                    ' activate ' + self.name
+                )
+                self.__start(su_aware=su_aware, cmd=cmd, binary=py_bin_path)
         except WinT.error, e:
             if e.args[0] == werr.ERROR_SERVICE_DOES_NOT_EXIST:
                 cmd = (
@@ -98,18 +102,20 @@ class Daemon(object):
                 self.__install(
                     su_aware=su_aware, cmd=cmd, binary=py_bin_path
                 )
-        # NOTE: Don't use a finally blocs so as to inform user about wrongly
+                svc_codes = w32scu.QueryServiceStatus(self.name)
+                if svc_codes[1] == w32svc.SERVICE_STOPPED:
+                    cmd = (
+                        src_file_md + os.sep + 'management' +
+                        os.sep + 'Administrator.py' +
+                        ' activate ' + self.name
+                    )
+                    self.__start(
+                        su_aware=su_aware, cmd=cmd, binary=py_bin_path
+                    )
+        # NOTE: Don't use a finally block so as to inform user about wrongly
         #       registered virtualenv value in the registry hive
         #       HKLM\Software\Python\PythonService\<py_ver - such as 2.7> for
         #       pythonservice.exe!
-        svc_codes = w32scu.QueryServiceStatus(self.name)
-        if svc_codes[1] == w32svc.SERVICE_STOPPED:
-            cmd = (
-                src_file_md + os.sep + 'management' +
-                os.sep + 'Administrator.py' +
-                ' activate ' + self.name
-            )
-            self.__start(su_aware=su_aware, cmd=cmd, binary=py_bin_path)
         self.pipe = ClientPipe.ClientPipe(name=self.name)
 
     def __install(self, su_aware, cmd, binary):
@@ -198,7 +204,7 @@ class Daemon(object):
             )
 
     @classmethod
-    def start(cls, name, timeout=1, retries=30):
+    def start(cls, name, timeout=1, retries=10):
         svc_codes = w32scu.QueryServiceStatus(
             serviceName=name
         )

@@ -58,6 +58,7 @@ class Pipe(object):
         CLIENT = 'client'
 
     # TODO: Check buffer ends by overflowing them!
+    # TODO: Create extrnally synced read_ex_sync & write_ex_sync.
     def __init__(self, name='', ptype=Type.NAMED, mode=Mode.DUPLEX,
                  channel=Channel.MESSAGE, transport=Transport.ASYNCHRONOUS,
                  view=View.SERVER, instances=0, buf_sz=[0, 0], sa=None):
@@ -213,7 +214,7 @@ class Pipe(object):
         buf_sz = buf_sz*2
         return w32f.AllocateReadBuffer(buf_sz)
 
-    def connect(self, timeout=0, buf_sz=0):
+    def connect(self, timeout=0, buf_sz=0, insync=True):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
             if int(timeout) == 0:
                 evTimeout = w32ev.INFINITE
@@ -230,6 +231,8 @@ class Pipe(object):
             # returns zero and GetLastError returns ERROR_PIPE_CONNECTED.
             if status_code == werr.ERROR_PIPE_CONNECTED:
                 w32ev.SetEvent(stream.hEvent)
+                if insync:
+                    return stream
             elif status_code != werr.ERROR_IO_PENDING:
                 raise PipeError(
                     'Failed to create unsynchronous named pipe connection!',
@@ -237,7 +240,10 @@ class Pipe(object):
                     status_code
                 )
             else:
-                self.__waitForEvent(stream, evTimeout)
+                if insync:
+                    self.__waitForEvent(stream, evTimeout)
+                else:
+                    return stream
         else:
             status_code = w32p.ConnectNamedPipe(self.__hPipe, None)
             if status_code != 0:
@@ -347,13 +353,17 @@ class Pipe(object):
                 self.__hPipe, payload, None
             )
 
+    # TODO: Make a generic close and create a customized close for each pipe
+    #       type (i.e. server/client)
     def close(self):
         if self.view == Pipe.View.SERVER:
             w32f.FlushFileBuffers(self.__hPipe)
             w32p.DisconnectNamedPipe(self.__hPipe)
         else:
             self.__hPipe.Close()
+            w32api.CloseHandle(self.__hPipe)
 
     def shutdown(self):
         if self.view == Pipe.View.SERVER:
             self.__hPipe.Close()
+            w32api.CloseHandle(self.__hPipe)

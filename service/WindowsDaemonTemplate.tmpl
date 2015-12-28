@@ -84,11 +84,18 @@ class {{name}}(object, w32scu.ServiceFramework):
         self.description = self._svc_description_
         self.logger = Logger()
 
+{% if action_init %}
+    {% if indent == 4 %}
+{{action_init|indent(4, true)}}
+    {% else %}
+{{action_init}}
+    {% endif %}
+{% endif %}
+
         w32scu.ServiceFramework.__init__(self, args)
         self.__hStop = w32ev.CreateEvent(None, False, False, None)
         self.__hShutdown = w32ev.CreateEvent(None, False, False, None)
         self.pipe = ServerPipe.ServerPipe(name=self.name, sa_profile='daemon')
-        self.stream = self.pipe._getOverlappedStruct()
         if self._svc_timeout_ == 0:
             self.__timeout = w32ev.INFINITE
         else:
@@ -116,8 +123,6 @@ class {{name}}(object, w32scu.ServiceFramework):
             self.display_name + ": Stopping service..."
         )
         self.ReportServiceStatus(w32svc.SERVICE_STOP_PENDING)
-        self.pipe.close()
-        self.pipe.shutdown()
         w32ev.SetEvent(self.__hStop)
 
     def _shutdown(self):
@@ -125,13 +130,11 @@ class {{name}}(object, w32scu.ServiceFramework):
             self.display_name + ": Shutting down service..."
         )
         self.ReportServiceStatus(w32svc.SERVICE_CONTROL_PRESHUTDOWN)
-        self.pipe.close()
-        self.pipe.shutdown()
         w32ev.SetEvent(self.__hShutdown)
 
-    {% if action_run %}
-    {{action_run|indent(4, false)}}
-    {% endif %}
+{% if action_run %}
+{{action_run|indent(4, false)}}
+{% endif %}
 
     {% if not action_run %}
     def run(self):
@@ -139,16 +142,16 @@ class {{name}}(object, w32scu.ServiceFramework):
         self.bootstrap()
 
         #TODO: Add pre-initialization code (like change pipe type etc)
-        self.__hEvents = self.__hStop, self.__hShutdown, self.stream.hEvent
 
         while True:
 
             self.preprocess()
 
             scm.LogInfoMsg(self.display_name + ": Waiting for connection...")
-            self.pipe.connect()
 
-            w32ev.SetEvent(self.stream.hEvent)
+            stream = self.pipe.connect(insync=False)
+
+            self.__hEvents = self.__hStop, self.__hShutdown, stream.hEvent
             rc = w32ev.MsgWaitForMultipleObjects(
                 self.__hEvents,
                 False,
@@ -158,12 +161,18 @@ class {{name}}(object, w32scu.ServiceFramework):
 
             if rc == w32ev.WAIT_OBJECT_0:
                 scm.LogInfoMsg(self.display_name + ": Received stop event...")
+                self.pipe.close()
+                self.pipe.shutdown()
                 break
             elif rc == w32ev.WAIT_OBJECT_0+1:
                 scm.LogInfoMsg(
                     self.display_name + ": Received shutdown event..."
                 )
+                self.pipe.close()
+                self.pipe.shutdown()
+                break
             elif rc == w32ev.WAIT_OBJECT_0+2:
+
                 scm.LogInfoMsg(self.display_name + ": Pipe client connected!")
 
                 self.advance()
@@ -177,7 +186,7 @@ class {{name}}(object, w32scu.ServiceFramework):
                 scm.LogInfoMsg(
                     self.display_name + ": Event timeout expired..."
                 )
-            else:
+            else:  # w32ev.WAIT_FAILED
                 raise RuntimeError("What is this? Quack quack!")
 
             self.postprocess()
@@ -196,14 +205,26 @@ class {{name}}(object, w32scu.ServiceFramework):
     def shutdown(self):
         self._shutdown()
 
-    {% if not action_run %}
-    {{action_bootstrap|indent(4, false)}}
+{% if not action_run %}
+    {% if indent == 4 %}
+{{ action_bootstrap|indent(4, true) }}
 
-    {{action_preprocess|indent(4, false)}}
+{{ action_preprocess|indent(4, true) }}
 
-    {{action_advance|indent(4, false)}}
+{{ action_advance|indent(4, true) }}
 
-    {{action_postprocess|indent(4, false)}}
+{{ action_postprocess|indent(4, true) }}
 
-    {{action_cleanup|indent(4, false)}}
-    {%- endif %}
+{{ action_cleanup|indent(4, true) }}
+    {% else %}
+{{ action_bootstrap|py_indent(4, [1], false, false) }}
+
+{{ action_preprocess|py_indent(4, [1], false, false) }}
+
+{{ action_advance|py_indent(4, [1], false, false) }}
+
+{{ action_postprocess|py_indent(4, [1], false, false) }}
+
+{{ action_cleanup|py_indent(4, [1], false, false) }}
+    {% endif %}
+{%- endif %}

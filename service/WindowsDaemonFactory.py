@@ -145,7 +145,6 @@ def instantiate(
         )
 
     if hasattr(action_md, class_name):
-        print('Class')
         action = getattr(action_md, class_name)
         indent = 0
         if not isinstance(action, type):
@@ -155,9 +154,40 @@ def instantiate(
                 type(action)
             )
     else:
-        print('Function')
         action = action_md
         indent = 4
+
+    # Discover any user imports and filter them if we have already imported
+    # them in our template.
+    action_imports = map(
+        lambda l: l.strip(),
+        filter(
+            lambda l: 'import' in l,
+            inspect.getsourcelines(action_md)[0]
+        )
+    )
+    action_imports = filter(
+        lambda f: 'import win32events as w32ev' not in f and
+                  'import win32file as w32f' not in f and
+                  'import win32service as w32svc' not in f and
+                  'import win32serviceutil as w32scu' not in f and
+                  'import ntsecuritycon as ntsec' not in f and
+                  'import pywintypes as WinT' not in f and
+                  'import servicemanager as scm' not in f and
+                  'from __future__ import absolute_import' not in f and
+                  'from __future__ import print_function' not in f and
+                  'from __future__ import unicode_literals' not in f and
+                  'from __future__ import generators' not in f and
+                  'import sys' not in f and
+                  'import multiprocessing' not in f and
+                  'import crapi.ipc.ServerPipe as ServerPipe' not in f and
+                  not f.startswith('#'),
+        action_imports
+    )
+    if not action_imports:
+        action_imports = ''
+    else:
+        action_imports = '\n'.join('%s' % i for i in action_imports)
 
     action_init = None
     action_run = None
@@ -314,6 +344,7 @@ def instantiate(
                             description=description,
                             timeout=timeout,
                             indent=indent,
+                            action_imports=action_imports,
                             action_advance=action_advance,
                             action_bootstrap=action_bootstrap,
                             action_preprocess=action_preprocess,
@@ -331,6 +362,7 @@ def instantiate(
                             description=description,
                             timeout=timeout,
                             indent=indent,
+                            action_imports=action_imports,
                             action_init=action_init,
                             action_advance=action_advance,
                             action_bootstrap=action_bootstrap,
@@ -350,6 +382,7 @@ def instantiate(
                             description=description,
                             timeout=timeout,
                             indent=indent,
+                            action_imports=action_imports,
                             action_run=action_run
                             ),
                         file=fdout
@@ -363,6 +396,7 @@ def instantiate(
                             description=description,
                             timeout=timeout,
                             indent=indent,
+                            action_imports=action_imports,
                             action_init=action_init,
                             action_run=action_run
                             ),

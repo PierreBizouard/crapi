@@ -16,20 +16,27 @@ from __future__ import unicode_literals
 from __future__ import generators
 # Python native libraries.
 import sys
+import multiprocessing
+
+{{action_imports}}
 
 import crapi.ipc.ServerPipe as ServerPipe
 
 # Python 3rd party libraries.
 if sys.platform.startswith('win'):
-    import servicemanager as scm
+    import win32event as w32ev
+    import win32file as w32f
     import win32service as w32svc
     import win32serviceutil as w32scu
-    import win32event as w32ev
+    import ntsecuritycon as ntsec
+    import pywintypes as WinT
+    import servicemanager as scm
 
 {#-
-# TODO: Add linux service entry points here or in another file!
+# FIXME: Add linux service entry points here or in another file!
 # TODO: Consider a parse decorator! :]
-# FIXME: Use a thread to keep the dispatcher usage at a minimum
+# TODO: Add custom entry points and event definition (use dispatch table?) :)
+# FIXME: Use a process to keep the dispatcher usage at a minimum
 #        and add a dictionary that maps a wait object to a dispatch
 #        table so to properly wrap functionality :)
 #        Example:         self.event = {
@@ -77,6 +84,51 @@ class {{name}}(object, w32scu.ServiceFramework):
     _svc_timeout_ = {{timeout}}
     _svc_package_ = str(sys.modules[__name__]) + '.' + __name__
 
+    def __notify_daemon_start(self):
+        scm.LogMsg(
+                scm.EVENTLOG_INFORMATION_TYPE,
+                scm.PYS_SERVICE_STARTED,
+                (self.name, '')
+        )
+
+    def __notify_daemon_stop(self):
+        scm.LogMsg(
+            scm.EVENTLOG_INFORMATION_TYPE,
+            scm.PYS_SERVICE_STOPPED,
+            (self.name, '')
+        )
+
+    # Proper security descriptor with World R/W access but only 'Owner'
+    # modify access. Thanks Mark :]
+    def channel_sa(self):
+        sa = WinT.SECURITY_ATTRIBUTES()
+        sidEveryone = WinT.SID()
+        sidEveryone.Initialize(
+            ntsec.SECURITY_WORLD_SID_AUTHORITY, True
+        )
+        sidEveryone.SetSubAuthority(
+            False, ntsec.SECURITY_WORLD_RID
+        )
+        sidCreator = WinT.SID()
+        sidCreator.Initialize(
+            ntsec.SECURITY_CREATOR_SID_AUTHORITY, True
+        )
+        sidCreator.SetSubAuthority(
+            False, ntsec.SECURITY_CREATOR_OWNER_RID
+        )
+
+        acl = WinT.ACL()
+        acl.AddAccessAllowedAce(
+            w32f.FILE_GENERIC_READ | w32f.FILE_GENERIC_WRITE,
+            sidEveryone
+        )
+        acl.AddAccessAllowedAce(
+            w32f.FILE_ALL_ACCESS, sidCreator
+        )
+        sa.SetSecurityDescriptorDacl(True, acl, False)
+
+        return sa
+
     def __init__(self, args):
 
         self.name = self._svc_name_
@@ -95,12 +147,18 @@ class {{name}}(object, w32scu.ServiceFramework):
         w32scu.ServiceFramework.__init__(self, args)
         self.__hStop = w32ev.CreateEvent(None, False, False, None)
         self.__hShutdown = w32ev.CreateEvent(None, False, False, None)
-        self.pipe = ServerPipe.ServerPipe(name=self.name, sa_profile='daemon')
         if self._svc_timeout_ == 0:
             self.__timeout = w32ev.INFINITE
         else:
             self.__timeout = self._svc_timeout_
         self.__event = w32ev.QS_ALLEVENTS
+
+        self.pipe = ServerPipe.ServerPipe(
+            name=self.name, sa=self.channel_sa()
+        )
+        self.dispatcher = []
+        self.notify_daemon_start = self.__notify_daemon_start
+        self.notify_daemon_stop = self.__notify_daemon_stop
 
     def SvcDoRun(self):
         self.start()
@@ -139,17 +197,19 @@ class {{name}}(object, w32scu.ServiceFramework):
     {% if not action_run %}
     def run(self):
 
-        self.bootstrap()
+        self.bootstrap_items = self.bootstrap()
 
         #TODO: Add pre-initialization code (like change pipe type etc)
 
         while True:
 
-            self.preprocess()
+            self.preprocess_items = self.preprocess()
 
             scm.LogInfoMsg(self.display_name + ": Waiting for connection...")
 
-            stream = self.pipe.connect(insync=False)
+            #FIXME: Add threading code, then augment with a thread pool or use
+            #       I/O completion ports.
+            stream = self.pipe.connect(ev_aware=False)
 
             self.__hEvents = self.__hStop, self.__hShutdown, stream.hEvent
             rc = w32ev.MsgWaitForMultipleObjects(
@@ -175,7 +235,12 @@ class {{name}}(object, w32scu.ServiceFramework):
 
                 scm.LogInfoMsg(self.display_name + ": Pipe client connected!")
 
-                self.advance()
+                # proc = multiprocessing.Process(
+                #     target=self.advance
+                # )
+                # self.dispatcher.append(proc)
+                # proc.start()
+                self.advance_items = self.advance()
 
                 scm.LogInfoMsg(
                     self.display_name + ": Finished processing pipe event..."
@@ -189,9 +254,9 @@ class {{name}}(object, w32scu.ServiceFramework):
             else:  # w32ev.WAIT_FAILED
                 raise RuntimeError("What is this? Quack quack!")
 
-            self.postprocess()
+            self.postprocess_items = self.postprocess()
 
-        self.cleanup()
+        self.cleanup_items = self.cleanup()
 
         scm.LogInfoMsg(self.display_name + ": Exiting service...")
     {% endif %}

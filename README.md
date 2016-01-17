@@ -50,14 +50,14 @@ A Python developer shouldn't have to figure this out especially when it's crafte
 
 Noone should have to do this. That's why we have attempted to do it FOR you WITHOUT you :P.
 
-P.S.: The above are not meant to criticize Mark Hammond's __pywin32__ excellent library. Merely, they indicate the difficulties a developer has to deal with by being forced to have to use:
-
-+ Non-portable code constructs due to multiple OSes with different APIs and native implementation.
-+ Components which are difficult to understand to begin with since they require deep knowledge and understanding of an OS's internals and intricate mechanicms.
+P.S.: The above are not meant to criticize Mark Hammond's __pywin32__ excellent library. Merely, they indicate the difficulties a developer has to deal with by being forced to use heterogeneous components and source code due to different OSes with incompatible APIs and native implementation.
 
 # **LICENSE**
 It's based on Apache Software License 2.0 (ASF 2.0) so without suggesting that this constitutes a legal advice in any way, shape or form: Do whatever the f*** you want with it as long as you give us proper credit! :}
 
 # **DISCLAIMER**
-The authors strive for a stable and coherent source code base however it should be considered experimental and pre-alpha and, as such, not production-ready so use at your own risk! In addition, the authors makes no guarantees that the code is of top-notch quality (any Win folks here?). Patches are welcome (of course).<br/>
+The authors strive for a stable and coherent source code base however it should be considered experimental and pre-alpha and, as such, not production-ready so use at your own risk! In addition, the authors makes no guarantees that the code is of top-notch quality (any Win folks here?). <br/>
 You have been (fore)warned!!! :]
+
+# **NOTE**
+Currently, only MS Windows is supported. Linux support coming soon :]

@@ -61,7 +61,8 @@ class Pipe(object):
     # TODO: Create extrnally synced read_ex_sync & write_ex_sync.
     def __init__(self, name='', ptype=Type.NAMED, mode=Mode.DUPLEX,
                  channel=Channel.MESSAGE, transport=Transport.ASYNCHRONOUS,
-                 view=View.SERVER, instances=0, buf_sz=[0, 0], sa=None):
+                 view=View.SERVER, instances=0, buf_sz=[512, 512],
+                 timeout=None, sa=None):
 
         if name == '':
             self.name = 'pipe' + str(random.randint(9999, 9999999))
@@ -69,9 +70,7 @@ class Pipe(object):
             self.name = name
 
         self.ptype = ptype
-        if self.ptype == Pipe.Type.NAMED:
-            pass
-        else:
+        if not self.ptype == Pipe.Type.NAMED:
             raise NotImplementedError('Sorry! This pipe type is a WIP!')
 
         self.mode = mode
@@ -115,11 +114,13 @@ class Pipe(object):
             if self.__mode == w32p.PIPE_ACCESS_DUPLEX:
                 self.__pipe_mode = w32f.GENERIC_READ | w32f.GENERIC_WRITE
 
+        # Maximum pipe instances are 255 client + 1 for the server. See also:
+        # https://msdn.microsoft.com/en-us/library/windows/desktop/aa365150%28v=vs.85%29.aspx
         if instances < 0:
             raise ValueError(
                 'Invalid # of instances: Only positive numbers are allowed!'
             )
-        elif instances == 0:
+        elif instances == 0 or instances > 255:
             self.__instances = w32p.PIPE_UNLIMITED_INSTANCES
             self.instances = float('inf')
         else:
@@ -130,6 +131,20 @@ class Pipe(object):
                 raise ValueError(
                     'Buffer size cannot be negative!'
                 )
+        if timeout is None:
+            if self.view == Pipe.View.CLIENT:
+                self.__timeout = w32p.NMPWAIT_WAIT_FOREVER
+            else:
+                self.__timeout = 0  # 50ms per MSDN documentation
+            self.timeout = float('inf')
+        elif timeout == 0:
+            if self.view == Pipe.View.CLIENT:
+                self.__timeout = w32p.NMPWAIT_USE_DEFAULT_WAIT
+            else:
+                self.__timeout = 0  # 50ms per MSDN documentation
+            self.timeout = 50
+        else:
+            self.__timeout = self.timeout = timeout
 
         if self.ptype == Pipe.Type.NAMED:
             if self.view == Pipe.View.SERVER:
@@ -140,19 +155,45 @@ class Pipe(object):
                     self.__instances,
                     buf_sz[1],
                     buf_sz[0],
-                    0,  # 50ms per MSDN documentation
+                    self.__timeout,
                     sa
                 )
             else:
-                self.__hPipe = w32f.CreateFile(
-                    '\\\\.\\pipe\\' + self.name,
-                    self.__pipe_mode,
-                    0,
-                    None,
-                    self.__open_mode,
-                    self.__open_mode2,
-                    None
-                )
+                try:
+                    self.__hPipe = w32f.CreateFile(
+                        '\\\\.\\pipe\\' + self.name,
+                        self.__pipe_mode,
+                        0,
+                        None,
+                        self.__open_mode,
+                        self.__open_mode2,
+                        None
+                    )
+                except WinT.error, e:
+                    if e.args[0] == werr.ERROR_PIPE_BUSY:
+                        try:
+                            w32p.WaitNamedPipe(
+                                '\\\\.\\pipe\\' + self.name,
+                                self.__timeout,
+                            )
+                        except WinT.error, e:
+                            if e.args[0] == werr.ERROR_SEM_TIMEOUT:
+                                raise PipeTimeoutError(
+                                    'Connection timeout while awaiting pipe '
+                                    'server response!',
+                                    'timeout',
+                                    self.timeout
+                                )
+                        else:
+                            self.__hPipe = w32f.CreateFile(
+                                '\\\\.\\pipe\\' + self.name,
+                                self.__pipe_mode,
+                                0,
+                                None,
+                                self.__open_mode,
+                                self.__open_mode2,
+                                None
+                            )
 
     # FIXME: Access with properties ;)
     def _getOverlappedStruct(self):
@@ -214,7 +255,7 @@ class Pipe(object):
         buf_sz = buf_sz*2
         return w32f.AllocateReadBuffer(buf_sz)
 
-    def connect(self, timeout=0, buf_sz=0, insync=True):
+    def connect(self, timeout=0, buf_sz=0, ev_aware=True):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
             if int(timeout) == 0:
                 evTimeout = w32ev.INFINITE
@@ -227,11 +268,13 @@ class Pipe(object):
             )
             # From the MSDN docs:
             #   https://msdn.microsoft.com/en-us/library/windows/desktop/aa365146(v=vs.85).aspx
-            # If a client connects before the function is called, the function
-            # returns zero and GetLastError returns ERROR_PIPE_CONNECTED.
+            # If a client connects before the function is called (i.e.
+            # the timeframe between CreateNamedPipe and ConnectNamedPipe, the
+            # latter function returns zero and GetLastError returns
+            # ERROR_PIPE_CONNECTED.
             if status_code == werr.ERROR_PIPE_CONNECTED:
                 w32ev.SetEvent(stream.hEvent)
-                if insync:
+                if ev_aware:
                     return stream
             elif status_code != werr.ERROR_IO_PENDING:
                 raise PipeError(
@@ -240,7 +283,7 @@ class Pipe(object):
                     status_code
                 )
             else:
-                if insync:
+                if ev_aware:
                     self.__waitForEvent(stream, evTimeout)
                 else:
                     return stream
@@ -267,7 +310,9 @@ class Pipe(object):
     # TODO: ERROR_MORE_DATA in synchronous I/O only?
     def read(self, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
-            if int(timeout) == 0:
+            if timeout is None:
+                evTimeout = 50  # 50ms is the default value per MSDN docs.
+            elif int(timeout) == 0:
                 evTimeout = 50  # 50ms is the default value per MSDN docs.
             else:
                 evTimeout = int(timeout)
@@ -288,6 +333,7 @@ class Pipe(object):
                         raise
                 if pipe_status == 0 or \
                    pipe_status == werr.ERROR_IO_PENDING:
+                    #TODO: Return stream and then prompt user to fetch data.
                     if pipe_status == werr.ERROR_IO_PENDING:
                         self.__waitForEvent(stream, evTimeout)
                     try:
@@ -333,7 +379,9 @@ class Pipe(object):
     #       that this is a possiblity...
     def write(self, payload, timeout=0, buf_sz=0):
         if self.transport == Pipe.Transport.ASYNCHRONOUS:
-            if int(timeout) == 0:
+            if timeout is None:
+                evTimeout = 50  # 50ms is the default value per MSDN docs.
+            elif int(timeout) == 0:
                 evTimeout = 50  # 50ms is the default value per MSDN docs.
             else:
                 evTimeout = int(timeout)
@@ -341,7 +389,7 @@ class Pipe(object):
             if buf_sz > 0:
                 str_buf = buffer(payload, 0, payload[:buf_sz]*2)
             else:
-                str_buf = buffer(payload, 0, 2048)
+                str_buf = buffer(payload, 0, 1024)
             # FIXME: ERROR_NO_DATA with Ctrl-C in server
             status_code, written_bytes = w32f.WriteFile(
                 self.__hPipe, str_buf, stream
@@ -353,11 +401,10 @@ class Pipe(object):
                 self.__hPipe, payload, None
             )
 
-    # TODO: Make a generic close and create a customized close for each pipe
-    #       type (i.e. server/client)
     def close(self):
         if self.view == Pipe.View.SERVER:
-            w32f.FlushFileBuffers(self.__hPipe)
+            if self.transport == Pipe.Transport.SYNCHRONOUS:
+                w32f.FlushFileBuffers(self.__hPipe)
             w32p.DisconnectNamedPipe(self.__hPipe)
         else:
             self.__hPipe.Close()

@@ -36,7 +36,7 @@ if sys.platform.startswith('win'):
     import winerror as werr
 
 
-# NOTE: SEE_MASK_NOASYNC = SEE_MASK_NOCLOSEPROCESS + SEE_MASK_FLAG_DDEWAIT
+# TODO: Add support for friendly_name.
 class Daemon(object):
 
     def __init__(
@@ -75,7 +75,7 @@ class Daemon(object):
 
         # FIXME (critical): Check the registry that:
         #        HKLM\Software\Python\PythonService\<py_ver - such as 2.7> key
-        #       is correctly set!
+        #       is correctly set (bug of pywin32 maybe?)!
         # TODO: If the service is already installed reload its signature via
         #        the registry.
         # TODO: If the service is deleted from sc.exe then add this file to
@@ -116,7 +116,6 @@ class Daemon(object):
         #       registered virtualenv value in the registry hive
         #       HKLM\Software\Python\PythonService\<py_ver - such as 2.7> for
         #       pythonservice.exe!
-        self.pipe = ClientPipe.ClientPipe(name=self.name)
 
     def __install(self, su_aware, cmd, binary):
         try:
@@ -165,6 +164,7 @@ class Daemon(object):
         finally:
             self.start(name=self.name)
 
+    # NOTE: SEE_MASK_NOASYNC = SEE_MASK_NOCLOSEPROCESS + SEE_MASK_FLAG_DDEWAIT
     @classmethod
     def __elevate(cls, binary, cmd, timeout):
         hProc = w32sh_sh.ShellExecuteEx(
@@ -223,10 +223,14 @@ class Daemon(object):
                 serviceName=name
             )
 
+    def connect(self):
+        self.pipe = ClientPipe.ClientPipe(name=self.name)
+
     def send(self, msg, timeout=0):
-        # It is important to encode the message in ASCII otherwise it won't be
-        # visible in the Event viewer log.
-        # TODO: Some py2k vs py3k compatibility maybe???
+        # NOTE: It is important to encode the message in ASCII otherwise
+        # it won't be visible in the Event viewer log and 'unparseable' by
+        # the Daemon class.
+        # Some kind of py2k and py3k byte issue...
         return self.pipe.write(
             payload=msg.encode('ascii', 'ignore'), timeout=timeout
         )

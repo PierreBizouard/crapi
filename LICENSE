@@ -1,0 +1,91 @@
+# Copyright (C) 2014-2017 - Diakos Iraklis (hdiakos@outlook.com)
+# Pilavidis Kriton (kriton_pilavidis@outlook.com)
+#
+# All Rights Reserved.
+#
+# You may use, distribute and modify this code under the terms of the MIT
+# license UNLESS stated otherwise.
+#
+# The MIT License
+#
+# This license is applicable to the core of CRAPI, and any parts of CRAPI's
+# source code and/or components not explicitly mentioned in other license
+# sections.
+#
+# Copyright (C) 2014-2017 - Diakos Iraklis, Pilavidis Kriton
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# =============================================================================
+# crapi.misc/Utils.py
+# =============================================================================
+#
+# You may use, distribute and modify this code under the terms of the MIT
+# license EXCEPT for:
+#
+# The 'ReentrantRWLock(object)' class
+#
+# Source code URL (reference; recommended):
+# https://github.com/ActiveState/code/tree/master/recipes/Python/502283_ReadWrite_Lock_class_RLock_like
+# Original source code URL:
+# http://code.activestate.com/recipes/502283-read-write-lock-class-rlock-like/
+#
+# NOTE: Our implementation contains slight modification in method signature and
+# blocking condition but core logic still remains intact.
+#
+# Copyright (C) 2007, Heiko Wundram. All Rights Reserved.
+#
+# You may use, distribute and modify this code under the terms of the PSF
+# license.
+#
+# All Other Rights Reserved and are of their respective owners.
+#
+# You should have received a copy of the PSF license with this project.
+# If not, please visit: http://opensource.org/licenses/Python-2.0
+#
+# =============================================================================
+# crapi.shell/InteractiveTTY.py
+# =============================================================================
+#
+# You may use, distribute and modify this code under the terms of the MIT
+# license.
+#
+# Attributions / References:
+#
+# Many special thanks to the authors below for giving me ideas and assisting me
+# in creating an interactive TTY library module.
+#
+# SO question (with variosu answers): https://goo.gl/M2qnfe (1)
+# Brian Fitzgerald's blog           : http://goo.gl/ZzuEiW  (2)
+# Shrikant Sharat's blog            : http://goo.gl/c6TPsH  (3)
+# Stefaan Lippens' blog             : http://goo.gl/P6ZXhi  (4)
+# JimmyG Github blog                : http://goo.gl/RF6kcc  (5)
+# NOTE: (5) is dead as blog is no longer public.
+#
+# (1) https://stackoverflow.com/questions/375427/non-blocking-read-on-a-subprocess-pipe-in-python
+# (2) http://blog.bfitz.us/?p=2348
+# (3) http://sharats.me/the-ever-useful-and-neat-subprocess-module.html#running-via-the-shell
+# (4) http://stefaanlippens.net/python-asynchronous-subprocess-pipe-reading/
+# (5) https://thejimmyg.github.io//blog/2009/working-with-python-subprocess.html#what-happens-when-you-execute-a-command
+#
+# All Other Rights Reserved and are of their respective owners.
+#
+# You should have received a copy of the MIT license with this project.
+# If not, please visit: https://opensource.org/licenses/MIT
+#

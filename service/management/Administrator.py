@@ -1,10 +1,3 @@
-# Copyright (C) 2014/15 - Iraklis Diakos (hdiakos@outlook.com)
-# Pilavidis Kriton (kriton_pilavidis@outlook.com)
-# All Rights Reserved.
-# You may use, distribute and modify this code under the
-# terms of the ASF 2.0 license.
-#
-
 """Python script to request service privileged operations via UAC/gksudo."""
 
 #!/usr/bin/env python
@@ -57,6 +50,7 @@ def __stop(args):
         w32scu.StopService(
             serviceName=args.name
         )
+
 
 if __name__ == "__main__":
 
@@ -127,6 +121,7 @@ if __name__ == "__main__":
         help='Name of the Windows/Linux daemon service.'
     )
     activate.set_defaults(func=__activate)
+
     # Stop (suspend).
     stop = cli_sub.add_parser(
         'stop', help='Stop a Windows/Linux daemon service.'

@@ -1,10 +1,3 @@
-# Copyright (C) 2014/15 - Iraklis Diakos (hdiakos@outlook.com)
-# Pilavidis Kriton (kriton_pilavidis@outlook.com)
-# All Rights Reserved.
-# You may use, distribute and modify this code under the
-# terms of the ASF 2.0 license.
-#
-
 """Part of the misc module."""
 
 from __future__ import absolute_import
@@ -17,17 +10,33 @@ import sys
 import threading
 import time
 
-"""ReentrantRWLock.py - Read-Write lock thread lock implementation
+
+class ThreadSafeGenerator(object):
+
+    def __init__(self, gn):
+        self.lock = threading.Lock()
+        self.generator = gn.__iter__()
+
+    def __iter__(self):
+        return self
+
+    # Py3 compatible.
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        self.lock.acquire()
+        try:
+            return self.generator.next()
+        finally:
+            self.lock.release()
+
+
+"""ReentrantRWLock - Read-Write lock thread lock implementation
 
 See the class documentation for more info.
 
-Copyright (C) 2007, Heiko Wundram.
-Released under the BSD-license.
-
-NOTE: Contains modification in method signature and condition in blocking
-but core logic remains still the same.
-Original source code URL:
-http://code.activestate.com/recipes/502283-read-write-lock-class-rlock-like/
+Check the LICENSE for more details about this code segment.
 """
 
 
@@ -54,7 +63,7 @@ class ReentrantRWLock(object):
     may perform this kind of lock upgrade, as a deadlock would otherwise
     occur. After the write lock has been granted, the thread will hold a
     full write lock, and not be downgraded after the upgrading call to
-    acquireWrite() has been match by a corresponding release().
+    acquireWrite() has been matched by a corresponding release().
     """
 
     def __init__(self):
@@ -151,7 +160,7 @@ class ReentrantRWLock(object):
                     # Signal this to user.
                     raise ValueError(
                         "Inevitable deadlock, write lock denied!"
-                        )
+                    )
                 upgradewriter = True
                 self.__upgradewritercount = self.__readers.pop(me)
             else:

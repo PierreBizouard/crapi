@@ -1,6 +1,6 @@
 --extra-index-url https://repo.fury.io/kounavi/
 -e .
-enum34==1.1.1
+enum34==1.1.6
 future==0.15.2
 jinja2==2.8
 MarkupSafe==0.23

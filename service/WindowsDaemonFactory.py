@@ -1,10 +1,3 @@
-# Copyright (C) 2014/15 - Iraklis Diakos (hdiakos@outlook.com)
-# Pilavidis Kriton (kriton_pilavidis@outlook.com)
-# All Rights Reserved.
-# You may use, distribute and modify this code under the
-# terms of the ASF 2.0 license.
-#
-
 """Part of the service module."""
 
 # NOTE: unicode_literals causes problems when using instantiation with 'type'
@@ -55,7 +48,8 @@ class WindowsDaemonFactory(object):
     """A class that allows creating templated Windows services."""
 
 
-def __xor(a, b): return bool(a) ^ bool(b)
+def __xor(a, b):
+    return bool(a) ^ bool(b)
 
 
 # Jinja2 custom template filters.
@@ -69,7 +63,7 @@ def py_indent(s, indent, lines, indent_first, same, maximum=False):
             for i in range(indent):
                 space += ' '
         else:
-            for i in range(indent//2):
+            for i in range(indent // 2):
                 space += ' '
         source[0] = space + source[0]
     for line in source:
@@ -77,13 +71,13 @@ def py_indent(s, indent, lines, indent_first, same, maximum=False):
         if maximum:
             for i in range(indent):
                 space += ' '
-            source[l-1] = space + source[l-1]
+            source[l - 1] = space + source[l - 1]
             l += 1
         else:
             if l in lines:
                 for i in range(indent):
                     space += ' '
-                source[l-1] = space + source[l-1]
+                source[l - 1] = space + source[l - 1]
             l += 1
     return '\n'.join(source)
 
@@ -95,7 +89,7 @@ def py_indent(s, indent, lines, indent_first, same, maximum=False):
     #TODO: Use uuid and anonymous groups with dictionary lookups.
 def instantiate(
     name='crapi', display_name='CRAPI: Common Range API',
-    description='Dynamic runtime templating engine of Daemon services.',
+    description='Dynamic runtime templating engine of system services.',
     timeout=0, action_policy=ACTION.UPDATE, action_file='.'
 ):
 
@@ -239,7 +233,7 @@ def instantiate(
         elif not __xor(
                 isinstance(action.advance, types.FunctionType),
                 isinstance(action.advance, types.MethodType)
-             ):
+        ):
                 raise DaemonContractError(
                     'The advance method signature is not a function!',
                     'action.advance',
@@ -350,7 +344,7 @@ def instantiate(
                             action_preprocess=action_preprocess,
                             action_postprocess=action_postprocess,
                             action_cleanup=action_cleanup
-                            ),
+                        ),
                         file=fdout
                     )
                 else:
@@ -369,7 +363,7 @@ def instantiate(
                             action_preprocess=action_preprocess,
                             action_postprocess=action_postprocess,
                             action_cleanup=action_cleanup
-                            ),
+                        ),
                         file=fdout
                     )
             else:
@@ -384,7 +378,7 @@ def instantiate(
                             indent=indent,
                             action_imports=action_imports,
                             action_run=action_run
-                            ),
+                        ),
                         file=fdout
                     )
                 else:
@@ -399,7 +393,7 @@ def instantiate(
                             action_imports=action_imports,
                             action_init=action_init,
                             action_run=action_run
-                            ),
+                        ),
                         file=fdout
                     )
 

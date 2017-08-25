@@ -1,10 +1,3 @@
-# Copyright (C) 2014/15 - Iraklis Diakos (hdiakos@outlook.com)
-# Pilavidis Kriton (kriton_pilavidis@outlook.com)
-# All Rights Reserved.
-# You may use, distribute and modify this code under the
-# terms of the ASF 2.0 license.
-#
-
 """Part of the ipc module."""
 
 from __future__ import absolute_import

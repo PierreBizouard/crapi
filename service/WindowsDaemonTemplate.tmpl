@@ -1,10 +1,3 @@
-# Copyright (C) 2014/15 - Iraklis Diakos (hdiakos@outlook.com)
-# Pilavidis Kriton (kriton_pilavidis@outlook.com)
-# All Rights Reserved.
-# You may use, distribute and modify this code under the
-# terms of the ASF 2.0 license.
-#
-
 """{{class_docstring}}"""
 
 # NOTE: unicode_literals causes problems when using instantiation with 'type'
@@ -16,7 +9,7 @@ from __future__ import unicode_literals
 from __future__ import generators
 # Python native libraries.
 import sys
-import multiprocessing
+#import multiprocessing
 
 {{action_imports}}
 
@@ -224,14 +217,14 @@ class {{name}}(object, w32scu.ServiceFramework):
                 self.pipe.close()
                 self.pipe.shutdown()
                 break
-            elif rc == w32ev.WAIT_OBJECT_0+1:
+            elif rc == w32ev.WAIT_OBJECT_0 + 1:
                 scm.LogInfoMsg(
                     self.display_name + ": Received shutdown event..."
                 )
                 self.pipe.close()
                 self.pipe.shutdown()
                 break
-            elif rc == w32ev.WAIT_OBJECT_0+2:
+            elif rc == w32ev.WAIT_OBJECT_0 + 2:
 
                 scm.LogInfoMsg(self.display_name + ": Pipe client connected!")
 
@@ -245,7 +238,7 @@ class {{name}}(object, w32scu.ServiceFramework):
                 scm.LogInfoMsg(
                     self.display_name + ": Finished processing pipe event..."
                 )
-            elif rc == w32ev.WAIT_OBJECT_0+len(self.__hEvents):
+            elif rc == w32ev.WAIT_OBJECT_0 + len(self.__hEvents):
                 scm.LogInfoMsg(self.display_name + ": All events...")
             elif rc == w32ev.WAIT_TIMEOUT:
                 scm.LogInfoMsg(

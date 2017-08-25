@@ -1,6 +1,7 @@
 # **Welcome to CRAPI!**
 
 <br/>
+
 **CRAPI** (spelled "crap-i" - and hoping not to be such one despite its name) or **Common Range API** is a library meant to ease the development in various areas of Linux and Windows using one common API. The library aims to be a highly stable version of common programming practices, constructs and OS native functions &amp; tools with a dedicated mindset in:
 
 +  Portability in Windows since Windows API is huge and complicated
@@ -12,13 +13,13 @@ We aim to cover most common scenarios beyond the basic API mechanisms (i.e. buil
 **Security issues** and **implementation correctness** are always a priority and will be taken into account however do note that until we reach a production/stable status we do not accept input but suggestions/comments and/or feedback are always welcome :)
 
 ## **Operating system support**
-Windows 7/8/8.1/10, Windows Server 2008 R2/2012 R2/2016 & major Linux variants:<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Debian 7.x and 8.x (untested) &amp; CentOS/RHEL 6.6 and 6.7 (tested).<br/>
+Windows 7/8.1/10, Windows Server 2008 R2/2012 R2/2016 & major Linux variants:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CentOS/RHEL > 6.x & 7.x (partially tested).<br/>
 Mac OS X is **NOT** supported (unless you buy me one maybe?).
 
 ## **Prerequisites**
 +  Python 2.6 or 2.7 with latest version of pip, wheel and setuptools.<br/>
-**Windows distributions**: Guess what? You need Mark Hammond's pywin32 module. Please use the one provided here: <a href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#pywin32" target="_blank">pywin32-Build 219 by Christoph Gohlke</a> and make sure to follow the installation instructions correctly.<br/>
+**Windows distributions**: Guess what? You need Mark Hammond's pywin32 module. Please use the one provided here: <a href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#pywin32" target="_blank">pywin32-Build 220 by Christoph Gohlke</a> and make sure to follow the installation instructions correctly.<br/>
 
 ## **Why another library?**
 How many times have you been forced to see this (non-parameterized example code for illustration purposes)?
@@ -53,10 +54,10 @@ Noone should have to do this. That's why we have attempted to do it FOR you WITH
 P.S.: The above are not meant to criticize Mark Hammond's __pywin32__ excellent library. Merely, they indicate the difficulties a developer has to deal with by being forced to use heterogeneous components and source code due to different OSes with incompatible APIs and native implementation.
 
 # **LICENSE**
-It's based on Apache Software License 2.0 (ASF 2.0) so without suggesting that this constitutes a legal advice in any way, shape or form: Do whatever the f*** you want with it as long as you give us proper credit! :}
+It's based on the MIT license so without suggesting that this constitutes a legal advice in any way, shape or form: Do whatever the f*** you want with it as long as you give us proper credit! :}
 
 # **DISCLAIMER**
-The authors strive for a stable and coherent source code base however it should be considered experimental and pre-alpha and, as such, not production-ready so use at your own risk! In addition, the authors makes no guarantees that the code is of top-notch quality (any Win folks here?). <br/>
+This library should be considered experimental and pre-alpha and, as such, not production-ready so use at your own risk! In addition, the authors makes no guarantees that the code is of top-notch quality (any Win folks here?). <br/>
 You have been (fore)warned!!! :]
 
 # **NOTE**

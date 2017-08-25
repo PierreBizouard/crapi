@@ -1,10 +1,3 @@
-# Copyright (C) 2014/15 - Iraklis Diakos (hdiakos@outlook.com)
-# Pilavidis Kriton (kriton_pilavidis@outlook.com)
-# All Rights Reserved.
-# You may use, distribute and modify this code under the
-# terms of the ASF 2.0 license.
-#
-
 """Part of the service module."""
 
 from __future__ import absolute_import
@@ -181,12 +174,12 @@ class Daemon(object):
         evCode = w32ev.WaitForSingleObject(hProc, timeout)
         if evCode == w32ev.WAIT_TIMEOUT:
             raise DaemonTimeoutError(
-                    'Timeout expired while awaiting elevation operation to '
-                    'complete!',
-                    'timeout',
-                    timeout,
-                    'event',
-                    evCode
+                'Timeout expired while awaiting elevation operation to '
+                'complete!',
+                'timeout',
+                timeout,
+                'event',
+                evCode
             )
         elif evCode != w32ev.WAIT_OBJECT_0:
             raise DaemonError(
